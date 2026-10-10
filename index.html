@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Was it stormy on your birthday? / Oliko syntymäpäivänäsi myrsky?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep: #1a1240;
+    --bg-panel: #241854;
+    --cloud-line: #3a2c72;
+    --accent-yellow: #ffd23f;
+    --accent-pink: #ff4fa3;
+    --accent-cyan: #4fe0ff;
+    --accent-purple: #a78bfa;
+    --text-primary: #ffffff;
+    --text-muted: #b8aee0;
+    --border: #3d2f78;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Quicksand', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ---------- cloud pattern background ---------- */
+  .cloud-field{
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .cloud-field svg{
+    position: absolute;
+    opacity: 0.5;
+  }
+
+  .puff{ animation: puffdrift 60s linear infinite; }
+  .puff.rev{ animation-direction: reverse; }
+
+  @keyframes puffdrift{
+    0%   { transform: translateX(0); }
+    50%  { transform: translateX(30px); }
+    100% { transform: translateX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .puff{ animation: none; }
+  }
+
+  /* ---------- layout ---------- */
+  .stage{
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4vw;
+    padding: 3vh 4vw;
+  }
+
+  .hero-side{
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: flex-grow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .stage.map-active .hero-side{ flex-grow: 2; }
+  .stage.map-active .card{ flex-grow: 1; }
+
+  .hero-side svg{
+    width: min(26vw, 360px);
+    height: auto;
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.35));
+  }
+
+  .float{
+    animation: bob 3.2s ease-in-out infinite;
+  }
+  @keyframes bob{
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-14px); }
+  }
+
+  .bolt-flash{
+    animation: flashbolt 2.6s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes flashbolt{
+    0%, 40%, 100% { opacity: 1; }
+    45%, 55%      { opacity: 0.25; }
+  }
+
+  .drop{ animation: fall 1.6s linear infinite; }
+  .drop.d2{ animation-delay: 0.4s; }
+  .drop.d3{ animation-delay: 0.8s; }
+  .drop.d4{ animation-delay: 1.2s; }
+  @keyframes fall{
+    0%   { transform: translateY(0); opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateY(22px); opacity: 0; }
+  }
+
+  .hero-title{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: clamp(28px, 3.2vw, 46px);
+    line-height: 1.1;
+    margin: 18px 0 0;
+    letter-spacing: -0.01em;
+    transition: font-size 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .stage.map-active .hero-title{ font-size: clamp(24px, 2.4vw, 34px); }
+
+  .hero-title .pop{ color: var(--accent-yellow); }
+
+  .hero-sub{
+    font-size: clamp(14px, 1.3vw, 19px);
+    color: var(--text-muted);
+    margin: 12px 0 0;
+    max-width: 32ch;
+    font-weight: 600;
+  }
+
+  /* ---------- map panel (replaces illustration after submit) ---------- */
+  .map-panel{
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .map-panel.active{ display: flex; }
+  .hero-illustration.hidden{ display: none; }
+
+  .map-frame-wrap{
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    max-height: 68vh;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 3px solid var(--border);
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.55);
+    background: var(--bg-panel);
+  }
+
+  .map-frame-wrap iframe{
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  .era5-panel{
+    display: none;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: clamp(16px, 3vw, 32px);
+    text-align: center;
+  }
+
+  .era5-panel svg{
+    width: min(18vw, 120px);
+    height: auto;
+    opacity: 0.9;
+  }
+
+  .era5-note{
+    font-size: clamp(13px, 1.2vw, 16px);
+    color: var(--text-muted);
+    font-weight: 600;
+    max-width: 34ch;
+  }
+
+  .map-frame-wrap.mode-era5 #ventuskyFrame{ display: none; }
+  .map-frame-wrap.mode-era5 .era5-panel{ display: flex; }
+
+  .map-caption{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: clamp(14px, 1.4vw, 18px);
+    margin-top: 14px;
+  }
+
+  .again-btn{
+    margin-top: 12px;
+    background: transparent;
+    border: 2px solid var(--accent-cyan);
+    color: var(--accent-cyan);
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 9px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .again-btn:hover{
+    background: var(--accent-cyan);
+    color: #16123a;
+  }
+
+  /* ---------- card ---------- */
+  .card{
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 560px;
+    background: var(--bg-panel);
+    border: 3px solid var(--border);
+    border-radius: 28px;
+    padding: clamp(20px, 3vh, 40px) clamp(20px, 2.4vw, 36px);
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.55);
+    position: relative;
+    transition: flex-grow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .toggle-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 clamp(14px, 2.2vh, 22px);
+  }
+
+  .lang-toggle, .source-toggle{
+    display: flex;
+    background: var(--bg-deep);
+    border: 2px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 2px;
+  }
+
+  .lang-toggle button, .source-toggle button{
+    all: unset;
+    cursor: pointer;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .lang-toggle button.active{
+    background: var(--accent-cyan);
+    color: #16123a;
+  }
+
+  .source-toggle button.active{
+    background: var(--accent-yellow);
+    color: #16123a;
+  }
+
+  .station-id{
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+  }
+
+  h1{
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: clamp(24px, 2.6vw, 34px);
+    line-height: 1.14;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+
+  h1 .bolt{ color: var(--accent-yellow); }
+
+  p.sub{
+    color: var(--text-muted);
+    font-size: clamp(13px, 1.1vw, 15px);
+    line-height: 1.55;
+    margin: 0 0 clamp(16px, 2.4vh, 26px);
+    font-weight: 600;
+  }
+
+  .date-fields{
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .field{
+    display: flex;
+    flex-direction: column;
+  }
+
+  .field label{
+    font-family: 'Fredoka', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .field input{
+    background: var(--bg-deep);
+    border: 3px solid var(--border);
+    border-radius: 14px;
+    color: var(--text-primary);
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    -moz-appearance: textfield;
+  }
+
+  .field input::-webkit-outer-spin-button,
+  .field input::-webkit-inner-spin-button{
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .field input:focus{
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 4px rgba(79,224,255,0.2);
+  }
+
+  .field.day input, .field.month input{
+    width: clamp(52px, 5.4vw, 68px);
+    font-size: clamp(20px, 2.2vw, 28px);
+    padding: clamp(10px, 1.6vh, 14px) 0;
+  }
+
+  .field.year input{
+    width: clamp(76px, 8vw, 100px);
+    font-size: clamp(20px, 2.2vw, 28px);
+    padding: clamp(10px, 1.6vh, 14px) 0;
+  }
+
+  .sep{
+    font-family: 'Fredoka', sans-serif;
+    font-size: clamp(20px, 2.2vw, 28px);
+    font-weight: 700;
+    color: var(--accent-purple);
+    padding-bottom: clamp(10px, 1.6vh, 14px);
+  }
+
+  .error{
+    font-family: 'Fredoka', sans-serif;
+    font-size: 13px;
+    color: var(--accent-pink);
+    margin: 8px 0 16px;
+    min-height: 18px;
+    font-weight: 600;
+  }
+
+  button.submit{
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent-yellow), #ffb23f);
+    color: #241854;
+    border: none;
+    border-radius: 16px;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: clamp(15px, 1.6vw, 19px);
+    padding: clamp(12px, 2vh, 17px) 18px;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.15s ease;
+    letter-spacing: 0.01em;
+    margin-top: 6px;
+    box-shadow: 0 8px 0 #d99c1f;
+  }
+
+  button.submit:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 10px 0 #d99c1f;
+  }
+
+  button.submit:active{
+    transform: translateY(4px);
+    box-shadow: 0 3px 0 #d99c1f;
+  }
+
+  .hint{
+    margin-top: clamp(14px, 2.2vh, 22px);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    border-top: 2px dashed var(--border);
+    padding-top: clamp(10px, 1.6vh, 16px);
+    font-weight: 600;
+  }
+
+  .hint b{
+    color: var(--accent-cyan);
+    font-weight: 700;
+  }
+
+  /* ---------- responsive fallback for narrow / tall screens ---------- */
+  @media (max-aspect-ratio: 4/3), (max-width: 820px){
+    html, body{ overflow-y: auto; overflow-x: hidden; height: auto; }
+    .stage{
+      height: auto;
+      min-height: 100vh;
+      flex-direction: column;
+      padding: 6vh 6vw;
+      gap: 24px;
+    }
+    .hero-side{ max-width: 100%; width: 100%; }
+    .hero-side svg{ width: min(50vw, 220px); }
+    .map-frame-wrap{ max-height: 42vh; }
+    .card{ width: min(90vw, 460px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="cloud-field">
+  <svg class="puff" style="top:6%; left:4%;" width="180" height="90" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+  <svg class="puff rev" style="top:16%; right:8%;" width="140" height="70" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+  <svg class="puff" style="bottom:10%; left:12%;" width="160" height="80" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+  <svg class="puff rev" style="bottom:20%; right:16%;" width="200" height="100" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+  <svg class="puff" style="top:44%; left:44%;" width="150" height="75" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+  <svg class="puff rev" style="top:70%; left:60%;" width="130" height="65" viewBox="0 0 180 90"><path d="M30 70 a25 25 0 0 1 0-50 a30 30 0 0 1 56-10 a25 25 0 0 1 34 24 a22 22 0 0 1 -4 44 H40 a20 20 0 0 1 -10-8z" fill="none" stroke="#3a2c72" stroke-width="3"/></svg>
+</div>
+
+<div class="stage" id="stage">
+
+  <div class="hero-side">
+
+    <div class="hero-illustration" id="heroIllustration">
+      <svg class="float" viewBox="0 0 300 280" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="150" cy="240" rx="90" ry="12" fill="#000000" opacity="0.18"/>
+        <path d="M60 140
+                 a44 44 0 0 1 0-88
+                 a54 54 0 0 1 100-18
+                 a44 44 0 0 1 60 42
+                 a40 40 0 0 1 -8 78
+                 H80
+                 a36 36 0 0 1 -20-14 z"
+              fill="#a78bfa"/>
+        <path d="M60 140
+                 a44 44 0 0 1 0-88
+                 a54 54 0 0 1 100-18
+                 a44 44 0 0 1 60 42
+                 a40 40 0 0 1 -8 78
+                 H80
+                 a36 36 0 0 1 -20-14 z"
+              fill="none" stroke="#241854" stroke-width="5"/>
+        <circle cx="118" cy="96" r="10" fill="#241854"/>
+        <circle cx="168" cy="96" r="10" fill="#241854"/>
+        <circle cx="121" cy="93" r="3" fill="#ffffff"/>
+        <circle cx="171" cy="93" r="3" fill="#ffffff"/>
+        <circle cx="100" cy="112" r="9" fill="#ff8fc7" opacity="0.7"/>
+        <circle cx="190" cy="112" r="9" fill="#ff8fc7" opacity="0.7"/>
+        <path d="M130 118 q13 12 26 0" stroke="#241854" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <polygon class="bolt-flash" points="150,150 132,192 148,192 138,228 176,178 156,178 168,150" fill="#ffd23f" stroke="#241854" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="#4fe0ff" stroke-width="6" stroke-linecap="round">
+          <line class="drop" x1="80" y1="150" x2="76" y2="166"/>
+          <line class="drop d2" x1="105" y1="158" x2="101" y2="174"/>
+          <line class="drop d3" x1="210" y1="150" x2="206" y2="166"/>
+          <line class="drop d4" x1="228" y1="160" x2="224" y2="176"/>
+        </g>
+      </svg>
+      <div class="hero-title" data-i18n-html="heroTitle">Meet <span class="pop">Gusti</span> the storm cloud!</div>
+      <div class="hero-sub" id="heroSubText">He's been watching the sky since 1979.</div>
+    </div>
+
+    <div class="map-panel" id="mapPanel">
+      <div class="map-frame-wrap" id="mapFrameWrap">
+        <iframe id="ventuskyFrame" title="Ventusky weather map" src="about:blank" loading="lazy" allow="fullscreen"></iframe>
+        <div class="era5-panel" id="era5Panel">
+          <svg viewBox="0 0 300 280" xmlns="http://www.w3.org/2000/svg">
+            <path d="M60 140
+                     a44 44 0 0 1 0-88
+                     a54 54 0 0 1 100-18
+                     a44 44 0 0 1 60 42
+                     a40 40 0 0 1 -8 78
+                     H80
+                     a36 36 0 0 1 -20-14 z"
+                  fill="#a78bfa"/>
+            <path d="M60 140
+                     a44 44 0 0 1 0-88
+                     a54 54 0 0 1 100-18
+                     a44 44 0 0 1 60 42
+                     a40 40 0 0 1 -8 78
+                     H80
+                     a36 36 0 0 1 -20-14 z"
+                  fill="none" stroke="#241854" stroke-width="5"/>
+            <circle cx="118" cy="96" r="10" fill="#241854"/>
+            <circle cx="168" cy="96" r="10" fill="#241854"/>
+            <circle cx="121" cy="93" r="3" fill="#ffffff"/>
+            <circle cx="171" cy="93" r="3" fill="#ffffff"/>
+          </svg>
+          <div class="era5-note" id="era5NoteText" data-i18n="era5Note">ERA5 opens Copernicus' weather replay in a new tab.</div>
+          <button class="again-btn" id="openEra5Btn" data-i18n="era5OpenBtn">Open ERA5 map ↗</button>
+        </div>
+      </div>
+      <div class="map-caption" id="mapCaption">Here's the winds on your birthday!</div>
+      <button class="again-btn" id="tryAgainBtn" data-i18n="tryAgain">Try another birthday</button>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <div class="source-toggle">
+        <button id="btnVentusky" class="active">Ventusky</button>
+        <button id="btnEra5">ERA5</button>
+      </div>
+      <div class="lang-toggle">
+        <button id="btnEN" class="active">EN</button>
+        <button id="btnFI">FI</button>
+      </div>
+    </div>
+
+    <div class="station-id" data-i18n="stationId">Weather time machine</div>
+    <h1 data-i18n-html="title">Was it stormy<br>on your <span class="bolt">birthday?</span></h1>
+    <p class="sub" data-i18n="sub">Type your birthday and Gus will show you the real winds from that day!</p>
+
+    <form id="birthdayForm" autocomplete="off">
+      <div class="date-fields">
+        <div class="field day">
+          <label for="day" data-i18n="labelDay">Day</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="day" maxlength="2" placeholder="DD">
+        </div>
+        <div class="sep">/</div>
+        <div class="field month">
+          <label for="month" data-i18n="labelMonth">Month</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="month" maxlength="2" placeholder="MM">
+        </div>
+        <div class="sep">/</div>
+        <div class="field year">
+          <label for="year" data-i18n="labelYear">Year</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="year" maxlength="4" placeholder="YYYY">
+        </div>
+      </div>
+
+      <div class="error" id="errorMsg"></div>
+      <button type="submit" class="submit" data-i18n="submit">Show me the winds! ⚡</button>
+    </form>
+
+    <div class="hint" id="hintText">
+      Shows a <b>real weather map</b> of Northern Europe with wind gusts from your special day. Try tapping the layer menu in the map to see pressure or temperature too!
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const i18n = {
+    en: {
+      stationId: "Weather time machine",
+      title: 'Was it stormy<br>on your <span class="bolt">birthday?</span>',
+      sub: "Type your birthday and Gusti will show you the real winds from that day!",
+      heroTitle: 'Meet <span class="pop">Gusti</span> the storm cloud!',
+      heroSub: (year) => `He's been watching the sky since ${year}.`,
+      labelDay: "Day",
+      labelMonth: "Month",
+      labelYear: "Year",
+      submit: "Show me the winds! ⚡",
+      hint: (source) => source === 'era5'
+        ? 'Opens a <b>real ERA5 weather map</b> of Northern Europe with wind from your special day in a new tab. ERA5 reanalysis data covers 1940&ndash;2026 &mdash; handy if your birthday is before Ventusky\'s 1979 start!'
+        : 'Shows a <b>real weather map</b> of Northern Europe with wind from your special day. Try tapping the layer menu in the map to see rain or temperature too! Ventusky covers 1979&ndash;2026.',
+      captionVentusky: "Here's the winds on your birthday!",
+      captionEra5: "Your ERA5 map opened in a new tab!",
+      tryAgain: "Try another birthday",
+      era5Note: "ERA5 opens Copernicus' weather replay in a new browser tab.",
+      era5OpenBtn: "Open ERA5 map ↗",
+      errEmpty: "Fill in day, month and year.",
+      errRange: "That date doesn't exist — check day and month.",
+      errYear: (min) => `Enter a year between ${min} and 2026.`,
+      errFuture: "Pick a date that isn't in the future."
+    },
+    fi: {
+      stationId: "Sään aikakone",
+      title: 'Oliko syntymäpäivänäsi<br><span class="bolt">myrsky?</span>',
+      sub: "Kirjoita syntymäaikasi, niin Gusti näyttää sinulle oikean tuulen siltä päivältä!",
+      heroTitle: 'Tässä <span class="pop">Gusti</span>, myrskypilvi!',
+      heroSub: (year) => `Se on tarkkaillut taivasta vuodesta ${year}.`,
+      labelDay: "Päivä",
+      labelMonth: "Kuukausi",
+      labelYear: "Vuosi",
+      submit: "Näytä taivas! ⚡",
+      hint: (source) => source === 'era5'
+        ? 'Avaa <b>oikean ERA5-sääkartan</b> Pohjois-Euroopasta: tuulet sinun päivänäsi, uudessa välilehdessä. ERA5-aineisto kattaa vuodet 1940&ndash;2026 &mdash; kätevä, jos syntymäpäiväsi on ennen Ventuskyn alkua 1979!'
+        : 'Näyttää <b>oikean sääkartan</b> Pohjois-Euroopasta tuulineen sinun päivänäsi. Kokeile karttaikkunan tasovalikkoa nähdäksesi myös ilmanpaineen tai lämpötilan! Ventusky kattaa vuodet 1979&ndash;2026.',
+      captionVentusky: "Tässä taivas syntymäpäivänäsi!",
+      captionEra5: "ERA5-karttasi avautui uuteen välilehteen!",
+      tryAgain: "Kokeile toista päivää",
+      era5Note: "ERA5 avaa Copernicuksen säätoiston uuteen välilehteen.",
+      era5OpenBtn: "Avaa ERA5-kartta ↗",
+      errEmpty: "Täytä päivä, kuukausi ja vuosi.",
+      errRange: "Tuota päivämäärää ei ole — tarkista päivä ja kuukausi.",
+      errYear: (min) => `Anna vuosi väliltä ${min}–2026.`,
+      errFuture: "Valitse päivämäärä, joka ei ole tulevaisuudessa."
+    }
+  };
+
+  const MIN_YEAR = { ventusky: 1979, era5: 1940 };
+
+  let currentLang = 'en';
+  let currentSource = 'ventusky';
+  let lastEra5Url = null;
+
+  const btnEN = document.getElementById('btnEN');
+  const btnFI = document.getElementById('btnFI');
+  const btnVentusky = document.getElementById('btnVentusky');
+  const btnEra5 = document.getElementById('btnEra5');
+  const errorMsg = document.getElementById('errorMsg');
+  const heroSubText = document.getElementById('heroSubText');
+  const hintText = document.getElementById('hintText');
+
+  function updateDynamicTexts(){
+    const t = i18n[currentLang];
+    const minYear = MIN_YEAR[currentSource];
+    heroSubText.textContent = t.heroSub(minYear);
+    hintText.innerHTML = t.hint(currentSource);
+  }
+
+  function applyLang(lang){
+    currentLang = lang;
+    const t = i18n[lang];
+    document.getElementById('htmlRoot').lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if(typeof t[key] === 'string') el.textContent = t[key];
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const key = el.getAttribute('data-i18n-html');
+      if(typeof t[key] === 'string') el.innerHTML = t[key];
+    });
+    btnEN.classList.toggle('active', lang === 'en');
+    btnFI.classList.toggle('active', lang === 'fi');
+    errorMsg.textContent = '';
+    updateDynamicTexts();
+    if(mapPanel.classList.contains('active')) updateMapCaption();
+  }
+
+  function applySource(source){
+    currentSource = source;
+    btnVentusky.classList.toggle('active', source === 'ventusky');
+    btnEra5.classList.toggle('active', source === 'era5');
+    errorMsg.textContent = '';
+    updateDynamicTexts();
+  }
+
+  btnEN.addEventListener('click', () => applyLang('en'));
+  btnFI.addEventListener('click', () => applyLang('fi'));
+  btnVentusky.addEventListener('click', () => applySource('ventusky'));
+  btnEra5.addEventListener('click', () => applySource('era5'));
+
+  const dayInput = document.getElementById('day');
+  const monthInput = document.getElementById('month');
+  const yearInput = document.getElementById('year');
+
+  function digitsOnly(e){
+    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+  }
+  [dayInput, monthInput, yearInput].forEach(inp => inp.addEventListener('input', digitsOnly));
+
+  dayInput.addEventListener('input', () => {
+    if(dayInput.value.length >= 2) monthInput.focus();
+  });
+  monthInput.addEventListener('input', () => {
+    if(monthInput.value.length >= 2) yearInput.focus();
+  });
+
+  const form = document.getElementById('birthdayForm');
+  const stage = document.getElementById('stage');
+  const heroIllustration = document.getElementById('heroIllustration');
+  const mapPanel = document.getElementById('mapPanel');
+  const mapFrameWrap = document.getElementById('mapFrameWrap');
+  const ventuskyFrame = document.getElementById('ventuskyFrame');
+  const mapCaption = document.getElementById('mapCaption');
+  const tryAgainBtn = document.getElementById('tryAgainBtn');
+  const openEra5Btn = document.getElementById('openEra5Btn');
+
+  function updateMapCaption(){
+    const t = i18n[currentLang];
+    mapCaption.textContent = currentSource === 'era5' ? t.captionEra5 : t.captionVentusky;
+  }
+
+  function resetToIllustration(){
+    stage.classList.remove('map-active');
+    mapPanel.classList.remove('active');
+    heroIllustration.classList.remove('hidden');
+    mapFrameWrap.classList.remove('mode-era5');
+    ventuskyFrame.src = 'about:blank';
+    lastEra5Url = null;
+    dayInput.value = '';
+    monthInput.value = '';
+    yearInput.value = '';
+    dayInput.focus();
+  }
+
+  tryAgainBtn.addEventListener('click', resetToIllustration);
+  openEra5Btn.addEventListener('click', () => {
+    if(lastEra5Url) window.open(lastEra5Url, '_blank');
+  });
+
+  function buildVentuskyUrl(y, m, d){
+    const pad = n => String(n).padStart(2, '0');
+    const timeParam = `${y}${pad(m)}${pad(d)}/12`;
+    const pinLabel = encodeURIComponent(currentLang === 'fi' ? 'Missä olemme' : 'Where we are');
+    return `https://embed.ventusky.com/?p=60.2;24.9;2&l=wind-10m&t=${timeParam}&w=0ImAE0A0a&pin=60.2;24.9;dot;${pinLabel}`;
+  }
+
+  function buildEra5Url(y, m, d){
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = `${y}-${pad(m)}-${pad(d)}`;
+    const params = {
+      lat: 50.4,
+      lon: 23.2,
+      zoom: 2.9,
+      datetime: dateStr + 'T12:00:00.000Z',
+      pickLat: 60.2,
+      pickLon: 24.9,
+      layers: 'mslContours,particles,fg10Max',
+      contourColor: 'a8a8a8',
+      windColor: '000000',
+      windGustsMin: 13.89,
+      windGustsMax: 41.67
+    };
+    const query = new URLSearchParams(params).toString();
+    return 'https://weather-replay.climate.copernicus.eu/?' + query;
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    const t = i18n[currentLang];
+    errorMsg.textContent = '';
+
+    const d = parseInt(dayInput.value, 10);
+    const m = parseInt(monthInput.value, 10);
+    const y = parseInt(yearInput.value, 10);
+    const minYear = MIN_YEAR[currentSource];
+
+    if(!dayInput.value || !monthInput.value || !yearInput.value){
+      errorMsg.textContent = t.errEmpty;
+      return;
+    }
+    if(y < minYear || y > 2026){
+      errorMsg.textContent = t.errYear(minYear);
+      return;
+    }
+    if(m < 1 || m > 12){
+      errorMsg.textContent = t.errRange;
+      return;
+    }
+    const daysInMonth = new Date(y, m, 0).getDate();
+    if(d < 1 || d > daysInMonth){
+      errorMsg.textContent = t.errRange;
+      return;
+    }
+    const picked = new Date(Date.UTC(y, m - 1, d));
+    const today = new Date();
+    if(picked > today){
+      errorMsg.textContent = t.errFuture;
+      return;
+    }
+
+    if(currentSource === 'era5'){
+      lastEra5Url = buildEra5Url(y, m, d);
+      mapFrameWrap.classList.add('mode-era5');
+      ventuskyFrame.src = 'about:blank';
+      window.open(lastEra5Url, '_blank');
+    } else {
+      mapFrameWrap.classList.remove('mode-era5');
+      ventuskyFrame.src = buildVentuskyUrl(y, m, d);
+    }
+
+    updateMapCaption();
+    heroIllustration.classList.add('hidden');
+    mapPanel.classList.add('active');
+    stage.classList.add('map-active');
+  });
+
+  // initialize dynamic text on load
+  updateDynamicTexts();
+</script>
+
+</body>
+</html>
